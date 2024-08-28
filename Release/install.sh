@@ -1,7 +1,7 @@
 #!/bin/bash
 
-FEDORA_QT5="/usr/lib64/qt5/plugins/okular/generators/"
-UBUNTU_QT5="/usr/lib/x86_64-linux-gnu/qt5/plugins/okular/generators/"
+FEDORA_QT5="/usr/lib64/qt6/plugins/okular_generators/"
+UBUNTU_QT5="/usr/lib/x86_64-linux-gnu/qt6/plugins/okular/generators/"
 
 install okularGenerator_poppler.so $FEDORA_QT5 2> /dev/null || \
 install okularGenerator_poppler.so $UBUNTU_QT5 2> /dev/null || \
