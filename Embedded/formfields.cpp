@@ -14,9 +14,9 @@
 #include "pdfsettings.h"
 #include "pdfsignatureutils.h"
 
-#include <poppler-qt5.h>
+#include <poppler-qt6.h>
 
-extern Okular::Action *createLinkFromPopplerLink(const Poppler::Link *popplerLink, bool deletePopplerLink = true);
+extern Okular::Action *createLinkFromPopplerLink(std::variant<const Poppler::Link *, std::unique_ptr<Poppler::Link>> popplerLink);
 #define SET_ANNOT_ACTIONS                                                                                                                                                                                                                      \
     setAdditionalAction(Okular::Annotation::CursorEntering, createLinkFromPopplerLink(m_field->additionalAction(Poppler::Annotation::CursorEnteringAction)));                                                                                  \
     setAdditionalAction(Okular::Annotation::CursorLeaving, createLinkFromPopplerLink(m_field->additionalAction(Poppler::Annotation::CursorLeavingAction)));                                                                                    \
@@ -463,5 +463,10 @@ bool PopplerFormFieldSignature::sign(const Okular::NewSignatureData &oData, cons
 {
     Poppler::PDFConverter::NewSignatureData pData;
     PDFGenerator::okularToPoppler(oData, &pData);
+#if POPPLER_VERSION_MACRO >= QT_VERSION_CHECK(24, 03, 0)
+    // 0 means "Chose an appropriate size"
+    pData.setFontSize(0);
+    pData.setLeftFontSize(0);
+#endif
     return m_field->sign(newPath, pData) == Poppler::FormFieldSignature::SigningSuccess;
 }

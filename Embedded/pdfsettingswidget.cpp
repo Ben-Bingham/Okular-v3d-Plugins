@@ -33,18 +33,25 @@ QString PDFSettingsWidget::popplerEnumToSettingString(Poppler::CryptoSignBackend
 
 static QString popplerEnumToUserString(Poppler::CryptoSignBackend backend)
 {
-    // I'm unsure if we want these translatable, but if so
-    // we sholud do something here rather than forward directly to the
-    // technical popplerEnumToSettingString
-    return PDFSettingsWidget::popplerEnumToSettingString(backend);
+    switch (backend) {
+        // I'm not sure it makes sense to translate these
+        // Should the translators ask for it, it should be quite simple.
+    case Poppler::CryptoSignBackend::NSS:
+        return QStringLiteral("NSS");
+    case Poppler::CryptoSignBackend::GPG:
+        return QStringLiteral("GnuPG (S/MIME)");
+    }
+    return {};
 }
 
 std::optional<Poppler::CryptoSignBackend> PDFSettingsWidget::settingStringToPopplerEnum(QStringView backend)
 {
-    if (backend == QStringLiteral("NSS"))
+    if (backend == QStringLiteral("NSS")) {
         return Poppler::CryptoSignBackend::NSS;
-    if (backend == QStringLiteral("GPG"))
+    }
+    if (backend == QStringLiteral("GPG")) {
         return Poppler::CryptoSignBackend::GPG;
+    }
     return std::nullopt;
 }
 #endif
@@ -78,7 +85,7 @@ PDFSettingsWidget::PDFSettingsWidget(QWidget *parent)
             }
         }
         int selected = -1;
-        for (auto backend : backends) {
+        for (auto backend : std::as_const(backends)) {
             if (backend == currentBackend) {
                 selected = m_pdfsw.kcfg_SignatureBackend->count();
             }
@@ -87,7 +94,7 @@ PDFSettingsWidget::PDFSettingsWidget(QWidget *parent)
         m_pdfsw.kcfg_SignatureBackend->setProperty("kcfg_property", QByteArray("currentData"));
 
         m_pdfsw.kcfg_SignatureBackend->setCurrentIndex(selected);
-        connect(m_pdfsw.kcfg_SignatureBackend, &QComboBox::currentTextChanged, [this](const QString &text) {
+        connect(m_pdfsw.kcfg_SignatureBackend, &QComboBox::currentTextChanged, this, [this](const QString &text) {
             auto backendEnum = settingStringToPopplerEnum(text);
             if (!backendEnum) {
                 return;
@@ -153,23 +160,29 @@ bool PDFSettingsWidget::event(QEvent *e)
     if (m_tree && e->type() == QEvent::Paint && !m_certificatesAsked) {
         m_certificatesAsked = true;
 
-        PopplerCertificateStore st;
-        bool userCancelled;
-        const QList<Okular::CertificateInfo> certs = st.signingCertificates(&userCancelled);
+        // Calling st.signingCertificates(&userCancelled) from the paint event handler results
+        // in "QWidget::repaint: Recursive repaint detected" warning and a crash when the
+        // certificate password dialog is closed. Delay the calling to avoid it.
+        auto loadCertificatesDelayed = [this]() {
+            PopplerCertificateStore st;
+            bool userCancelled;
+            const QList<Okular::CertificateInfo> certs = st.signingCertificates(&userCancelled);
 
-        m_pdfsw.loadSignaturesButton->setVisible(userCancelled);
+            m_pdfsw.loadSignaturesButton->setVisible(userCancelled);
 
-        for (const auto &cert : certs) {
-            new QTreeWidgetItem(m_tree,
-                                {cert.subjectInfo(Okular::CertificateInfo::EntityInfoKey::CommonName, Okular::CertificateInfo::EmptyString::TranslatedNotAvailable),
-                                 cert.subjectInfo(Okular::CertificateInfo::EntityInfoKey::EmailAddress, Okular::CertificateInfo::EmptyString::TranslatedNotAvailable),
-                                 cert.validityEnd().toString(QStringLiteral("yyyy-MM-dd"))});
-        }
+            for (const auto &cert : certs) {
+                new QTreeWidgetItem(m_tree,
+                                    {cert.subjectInfo(Okular::CertificateInfo::EntityInfoKey::CommonName, Okular::CertificateInfo::EmptyString::TranslatedNotAvailable),
+                                     cert.subjectInfo(Okular::CertificateInfo::EntityInfoKey::EmailAddress, Okular::CertificateInfo::EmptyString::TranslatedNotAvailable),
+                                     cert.validityEnd().toString(QStringLiteral("yyyy-MM-dd"))});
+            }
 
-        m_pdfsw.defaultLabel->setText(Poppler::getNSSDir());
+            m_pdfsw.defaultLabel->setText(Poppler::getNSSDir());
 
-        m_tree->resizeColumnToContents(1);
-        m_tree->resizeColumnToContents(0);
+            m_tree->resizeColumnToContents(1);
+            m_tree->resizeColumnToContents(0);
+        };
+        QMetaObject::invokeMethod(this, loadCertificatesDelayed, Qt::QueuedConnection);
     }
     return QWidget::event(e);
 }

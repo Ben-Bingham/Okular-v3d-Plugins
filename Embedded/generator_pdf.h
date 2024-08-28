@@ -13,7 +13,7 @@
 
 //#include "synctex/synctex_parser.h"
 
-#include <poppler-qt5.h>
+#include <poppler-qt6.h>
 #include <poppler-version.h>
 
 #define POPPLER_VERSION_MACRO ((POPPLER_VERSION_MAJOR << 16) | (POPPLER_VERSION_MINOR << 8) | (POPPLER_VERSION_MICRO))
@@ -29,31 +29,9 @@
 #include <interfaces/printinterface.h>
 #include <interfaces/saveinterface.h>
 
-#include <QAbstractScrollArea>
-
 #include <unordered_map>
 
-#include <QEvent>
-#include <QPainter>
-#include <QAbstractTextDocumentLayout>
-#include <KAboutData>
-#include <KConfigDialog>
-#include <KLocalizedString>
-#include <core/page.h>
-#include <core/utils.h>
-#include <vector>
-#include <fstream>
-#include <cstring>
-
-#include <core/textdocumentgenerator.h>
-#include <core/textdocumentgenerator_p.h>
-#include <QApplication>
-#include <QtWidgets>
-#include <QPushButton>
-
-#include <glm/gtx/string_cast.hpp>
-
-#include "V3dModelManager.h"
+#include "3rdParty/V3D-Common/V3dModelManager.h"
 
 class PDFOptionsPage;
 class PopplerAnnotationProxy;
@@ -78,14 +56,10 @@ class PDFGenerator : public Okular::Generator, public Okular::ConfigInterface, p
     Q_INTERFACES(Okular::PrintInterface)
     Q_INTERFACES(Okular::SaveInterface)
 
-// ==================================== Custom Addition ====================================
 public:
-    //V3dModelManager modelManager{ document(), "/home/benjaminb/kde/src/okular/generators/Okular-v3d-Embeded-Plugin-Code/3rdParty/V3D-Common/shaders/" };
-    V3dModelManager modelManager{ document(), "" };
+    //V3dModelManager modelManager{ document(), "/home/benjaminbb/kde/src/okular/generators/Okular-v3d-Embeded-Plugin-Code/3rdParty/V3D-Common/shaders/"};
+    V3dModelManager modelManager{ document(), "./"};
 
-// ================================= End of Custom Addition =================================
-
-public:
     PDFGenerator(QObject *parent, const QVariantList &args);
     ~PDFGenerator() override;
 
@@ -104,7 +78,6 @@ public:
     }
     QAbstractItemModel *layersModel() const override;
     void opaqueAction(const Okular::BackendOpaqueAction *action) override;
-    void freeOpaqueActionContents(const Okular::BackendOpaqueAction &action) override;
 
     // [INHERITED] document information
     bool isAllowed(Okular::Permission permission) const override;
@@ -160,7 +133,7 @@ private:
     // fetch the poppler page form fields
     QList<Okular::FormField *> getFormFields(Poppler::Page *popplerPage);
 
-    Okular::TextPage *abstractTextPage(const QList<Poppler::TextBox *> &text, double height, double width, int rot);
+    Okular::TextPage *abstractTextPage(const std::vector<std::unique_ptr<Poppler::TextBox>> &text, double height, double width, int rot);
 
     void resolveMediaLinkReferences(Okular::Page *page);
     void resolveMediaLinkReference(Okular::Action *action);
@@ -168,7 +141,7 @@ private:
     bool setDocumentRenderHints();
 
     // poppler dependent stuff
-    Poppler::Document *pdfdoc;
+    std::unique_ptr<Poppler::Document> pdfdoc;
 
     void xrefReconstructionHandler();
 
@@ -188,6 +161,8 @@ private:
     QBitArray rectsGenerated;
 
     QPointer<PDFOptionsPage> pdfOptionsPage;
+
+    bool documentHasPassword = false;
 };
 
 #endif

@@ -8,19 +8,20 @@ include_directories(
     "dependencies/" 
     "dependencies/VulkanTools" 
     "/usr/include/tirpc" 
-    "/home/benjaminb/kde/build/kparts/src/" 
-    "/home/benjaminb/kde/build/kparts/" 
+    "/home/benjaminbb/kde/build/kparts/src/" 
+    "/home/benjaminbb/kde/build/kparts/" 
     "../3rdParty/V3D-Common"
-    "/home/benjaminb/kde/src/okular/core"
+    "/home/benjaminbb/kde/src/okular/core/"
     "../3rdParty/gzip-hpp/include" 
-    "/usr/include/poppler/qt5"
+    "/usr/include/poppler/qt6"
 )
 
 add_compile_options(-fexceptions)
 
 ########### next target ###############
 set(
-    okularGenerator_v3d_SRCS src/v3d_generator.cpp 
+    okularGenerator_v3d_SRCS 
+    src/v3d_generator.cpp 
     ../3rdParty/V3D-Common/Rendering/renderheadless.cpp 
     ../3rdParty/V3D-Common/3rdParty/VulkanTools/VulkanTools.cpp 
     ../3rdParty/V3D-Common/V3dFile/V3dFile.cpp 
@@ -36,7 +37,7 @@ set(
 
 okular_add_generator(okularGenerator_v3d ${okularGenerator_v3d_SRCS})
 
-target_link_libraries(okularGenerator_v3d okularcore Qt5::Core KF5::I18n GLEW glfw GL vulkan dl pthread X11 Xxf86vm Xrandr Xi tirpc KF5::Parts Okular5Core)
+target_link_libraries(okularGenerator_v3d okularcore Qt6::Core KF6::I18n GLEW GL vulkan dl pthread X11 Xxf86vm Xrandr Xi tirpc)
 
 #list( APPEND CMAKE_INSTALL_RPATH "/usr/lib/dependencies" )
 set_target_properties(okularGenerator_v3d
