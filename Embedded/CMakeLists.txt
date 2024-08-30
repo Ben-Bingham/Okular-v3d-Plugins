@@ -7,14 +7,16 @@ set(CMAKE_REQUIRED_LIBRARIES Poppler::Qt6 Qt6::Core Qt6::Gui)
 
 include_directories(
    ${CMAKE_CURRENT_SOURCE_DIR}/../..
+)
 
+include_directories(
    "../3rdParty/V3D-Common" 
+   "../3rdParty/gzip-hpp/include"
+
+   "../../../core/" # ~/kde/src/okular/core
+
+   "/usr/include/poppler/qt5"
    "/usr/include/tirpc" 
-   "/home/benjaminbb/kde/build/kparts/src/" 
-   "/home/benjaminbb/kde/build/kparts/"
-   "/home/benjaminbb/kde/src/okular/core"
-   "../3rdParty/gzip-hpp/include" 
-   "/usr/include/poppler/qt6"
 )
 
 ########### next target ###############
@@ -27,17 +29,17 @@ set(okularGenerator_poppler_PART_SRCS
    pdfsettingswidget.cpp
    imagescaling.cpp
 
-   ../3rdParty/V3D-Common/V3dModel.cpp
-   ../3rdParty/V3D-Common/V3dModelManager.cpp
+   ../3rdParty/V3D-Common/Rendering/renderheadless.cpp
+   ../3rdParty/V3D-Common/3rdParty/VulkanTools/VulkanTools.cpp
    ../3rdParty/V3D-Common/V3dFile/V3dFile.cpp
    ../3rdParty/V3D-Common/V3dFile/V3dObject.cpp
    ../3rdParty/V3D-Common/V3dFile/V3dObjects.cpp
    ../3rdParty/V3D-Common/V3dFile/V3dUtil.cpp
    ../3rdParty/V3D-Common/Utility/Arcball.cpp
-   ../3rdParty/V3D-Common/Utility/EventFilter.cpp
    ../3rdParty/V3D-Common/Utility/ProtectedFunctionCaller.cpp
-   ../3rdParty/V3D-Common/Rendering/renderheadless.cpp
-   ../3rdParty/V3D-Common/3rdParty/VulkanTools/VulkanTools.cpp
+   ../3rdParty/V3D-Common/Utility/EventFilter.cpp
+   ../3rdParty/V3D-Common/V3dModel.cpp
+   ../3rdParty/V3D-Common/V3dModelManager.cpp
 )
 
 ki18n_wrap_ui(okularGenerator_poppler_PART_SRCS
@@ -48,7 +50,7 @@ kconfig_add_kcfg_files(okularGenerator_poppler_PART_SRCS GENERATE_MOC conf/pdfse
 
 okular_add_generator(okularGenerator_poppler ${okularGenerator_poppler_PART_SRCS})
 
-target_link_libraries(okularGenerator_poppler okularcore KF6::I18n KF6::Completion KF6::KIOWidgets Poppler::Qt6 Qt6::Xml vulkan tirpc z)
+target_link_libraries(okularGenerator_poppler okularcore KF6::I18n KF6::Completion KF6::KIOWidgets Poppler::Qt6 Qt6::Xml vulkan tirpc z Poppler::Qt6)
 
 ########### autotests ###############
 
