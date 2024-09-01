@@ -31,7 +31,7 @@
 
 #include <unordered_map>
 
-#include "3rdParty/V3D-Common/V3dModelManager.h"
+#include "../3rdParty/V3D-Common/V3dModelManager.h"
 
 class PDFOptionsPage;
 class PopplerAnnotationProxy;
