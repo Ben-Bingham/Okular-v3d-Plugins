@@ -31,7 +31,7 @@
 
 #include <unordered_map>
 
-#include "../3rdParty/V3D-Common/V3dModelManager.h"
+#include "../3rdParty/v3d-Common/V3dModelManager.h"
 
 class PDFOptionsPage;
 class PopplerAnnotationProxy;
@@ -57,8 +57,7 @@ class PDFGenerator : public Okular::Generator, public Okular::ConfigInterface, p
     Q_INTERFACES(Okular::SaveInterface)
 
 public:
-    //V3dModelManager modelManager{ document(), "/home/benjaminbb/kde/src/okular/generators/Okular-v3d-Embeded-Plugin-Code/3rdParty/V3D-Common/shaders/"};
-    V3dModelManager modelManager{ document(), "./"};
+    V3dModelManager modelManager{ document() };
 
     PDFGenerator(QObject *parent, const QVariantList &args);
     ~PDFGenerator() override;

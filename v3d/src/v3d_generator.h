@@ -12,8 +12,8 @@
 
 #include <core/textdocumentgenerator.h>
 
-#include "../3rdParty/V3D-Common/Rendering/renderheadless.h"
-#include "../3rdParty/V3D-Common/V3dFile/V3dFile.h"
+#include "../3rdParty/v3d-Common/Rendering/renderheadless.h"
+#include "../3rdParty/v3d-Common/V3dFile/V3dFile.h"
 
 #include <thread>
 #include "part/pageview.h"
@@ -22,7 +22,7 @@
 
 #include <chrono>
 
-#include "../3rdParty/V3D-Common/V3dModelManager.h"
+#include "../3rdParty/v3d-Common/V3dModelManager.h"
 
 class EventFilter;
 
@@ -39,6 +39,5 @@ public:
     bool doCloseDocument() override;
 
 private:
-    //V3dModelManager m_ModelManager{ document(), "kde/src/okular/generators/Okular-v3d-Plugin-Code/3rdParty/V3D-Common/shaders/" };
-    V3dModelManager m_ModelManager{ document(), "./" };
+    V3dModelManager m_ModelManager{ document() };
 };

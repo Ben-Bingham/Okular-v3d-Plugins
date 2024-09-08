@@ -30,8 +30,6 @@
 #include <thread>
 #include <chrono>
 
-#include <shell/shell.h>
-
 #include "part/pageview.h"
 
 #include <cmath>

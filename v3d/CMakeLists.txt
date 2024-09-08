@@ -2,18 +2,11 @@ remove_definitions(-DTRANSLATION_DOMAIN="okular")
 add_definitions(-DTRANSLATION_DOMAIN="okular_v3d" -DGLFW_INCLUDE_VULKAN -DVULKAN_DEBUG=1 -DGLM_FORCE_RIGHT_HANDED)
 
 include_directories(
-    "src/Rendering" 
-    "src/" 
-    "src/V3dFile" 
-    "dependencies/" 
-    "dependencies/VulkanTools" 
+    "../3rdParty/v3d-Common"
+ 
+    "../../../core/"
+ 
     "/usr/include/tirpc" 
-    "/home/benjaminbb/kde/build/kparts/src/" 
-    "/home/benjaminbb/kde/build/kparts/" 
-    "../3rdParty/V3D-Common"
-    "/home/benjaminbb/kde/src/okular/core/"
-    "../3rdParty/gzip-hpp/include" 
-    "/usr/include/poppler/qt6"
 )
 
 add_compile_options(-fexceptions)
@@ -22,29 +15,29 @@ add_compile_options(-fexceptions)
 set(
     okularGenerator_v3d_SRCS 
     src/v3d_generator.cpp 
-    ../3rdParty/V3D-Common/Rendering/renderheadless.cpp 
-    ../3rdParty/V3D-Common/3rdParty/VulkanTools/VulkanTools.cpp 
-    ../3rdParty/V3D-Common/V3dFile/V3dFile.cpp 
-    ../3rdParty/V3D-Common/V3dFile/V3dObjects.cpp 
-    ../3rdParty/V3D-Common/V3dFile/V3dObject.cpp 
-    ../3rdParty/V3D-Common/V3dFile/V3dUtil.cpp 
-    ../3rdParty/V3D-Common/Utility/ProtectedFunctionCaller.cpp 
-    ../3rdParty/V3D-Common/Utility/EventFilter.cpp 
-    ../3rdParty/V3D-Common/Utility/Arcball.cpp
-    ../3rdParty/V3D-Common/V3dModel.cpp
-    ../3rdParty/V3D-Common/V3dModelManager.cpp
+
+    ../3rdParty/v3d-Common/Rendering/renderheadless.cpp 
+    ../3rdParty/v3d-Common/3rdParty/VulkanTools/VulkanTools.cpp 
+    ../3rdParty/v3d-Common/V3dFile/V3dFile.cpp 
+    ../3rdParty/v3d-Common/V3dFile/V3dObjects.cpp 
+    ../3rdParty/v3d-Common/V3dFile/V3dObject.cpp 
+    ../3rdParty/v3d-Common/V3dFile/V3dUtil.cpp 
+    ../3rdParty/v3d-Common/Utility/ProtectedFunctionCaller.cpp 
+    ../3rdParty/v3d-Common/Utility/EventFilter.cpp 
+    ../3rdParty/v3d-Common/Utility/Arcball.cpp
+    ../3rdParty/v3d-Common/V3dModel.cpp
+    ../3rdParty/v3d-Common/V3dModelManager.cpp
 )
 
 okular_add_generator(okularGenerator_v3d ${okularGenerator_v3d_SRCS})
 
 target_link_libraries(okularGenerator_v3d okularcore Qt6::Core KF6::I18n GLEW GL vulkan dl pthread X11 Xxf86vm Xrandr Xi tirpc)
 
-#list( APPEND CMAKE_INSTALL_RPATH "/usr/lib/dependencies" )
-set_target_properties(okularGenerator_v3d
-    PROPERTIES
-    LINK_FLAGS "-L/home/benjaminb/kde/build/okular/bin/ -L/home/benjaminb/"
-    #-Wl,-rpath,/usr/lib:/usr/lib/dependencies
-)
+# #list( APPEND CMAKE_INSTALL_RPATH "/usr/lib/dependencies" )
+# set_target_properties(okularGenerator_v3d
+#     PROPERTIES
+#     LINK_FLAGS "-L/home/benjaminb/kde/build/okular/bin/ -L/home/benjaminb/"
+# )
 
 ########### install files ###############
 install( PROGRAMS okularApplication_v3d.desktop org.kde.mobile.okular_v3d.desktop  DESTINATION  ${KDE_INSTALL_APPDIR} )

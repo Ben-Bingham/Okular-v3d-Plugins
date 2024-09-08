@@ -6,15 +6,13 @@ add_subdirectory( conf )
 set(CMAKE_REQUIRED_LIBRARIES Poppler::Qt6 Qt6::Core Qt6::Gui)
 
 include_directories(
-   ${CMAKE_CURRENT_SOURCE_DIR}/../..
+   "../3rdParty/v3d-Common"
+   "../3rdParty/gzip-hpp/include"
 
-   "../3rdParty/V3D-Common" 
-   "/usr/include/tirpc" 
-   "/home/benjaminbb/kde/build/kparts/src/" 
-   "/home/benjaminbb/kde/build/kparts/"
-   "/home/benjaminbb/kde/src/okular/core"
-   "../3rdParty/gzip-hpp/include" 
+   "../../../core/"
+
    "/usr/include/poppler/qt6"
+   "/usr/include/tirpc" 
 )
 
 ########### next target ###############
@@ -27,17 +25,17 @@ set(okularGenerator_poppler_PART_SRCS
    pdfsettingswidget.cpp
    imagescaling.cpp
 
-   ../3rdParty/V3D-Common/V3dModel.cpp
-   ../3rdParty/V3D-Common/V3dModelManager.cpp
-   ../3rdParty/V3D-Common/V3dFile/V3dFile.cpp
-   ../3rdParty/V3D-Common/V3dFile/V3dObject.cpp
-   ../3rdParty/V3D-Common/V3dFile/V3dObjects.cpp
-   ../3rdParty/V3D-Common/V3dFile/V3dUtil.cpp
-   ../3rdParty/V3D-Common/Utility/Arcball.cpp
-   ../3rdParty/V3D-Common/Utility/EventFilter.cpp
-   ../3rdParty/V3D-Common/Utility/ProtectedFunctionCaller.cpp
-   ../3rdParty/V3D-Common/Rendering/renderheadless.cpp
-   ../3rdParty/V3D-Common/3rdParty/VulkanTools/VulkanTools.cpp
+   ../3rdParty/v3d-Common/V3dModel.cpp
+   ../3rdParty/v3d-Common/V3dModelManager.cpp
+   ../3rdParty/v3d-Common/V3dFile/V3dFile.cpp
+   ../3rdParty/v3d-Common/V3dFile/V3dObject.cpp
+   ../3rdParty/v3d-Common/V3dFile/V3dObjects.cpp
+   ../3rdParty/v3d-Common/V3dFile/V3dUtil.cpp
+   ../3rdParty/v3d-Common/Utility/Arcball.cpp
+   ../3rdParty/v3d-Common/Utility/EventFilter.cpp
+   ../3rdParty/v3d-Common/Utility/ProtectedFunctionCaller.cpp
+   ../3rdParty/v3d-Common/Rendering/renderheadless.cpp
+   ../3rdParty/v3d-Common/3rdParty/VulkanTools/VulkanTools.cpp
 )
 
 ki18n_wrap_ui(okularGenerator_poppler_PART_SRCS
