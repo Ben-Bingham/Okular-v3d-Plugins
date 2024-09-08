@@ -60,7 +60,7 @@ public:
     PDFGenerator(QObject *parent, const QVariantList &args);
     ~PDFGenerator() override;
 
-    V3dModelManager modelManager{ document(), "./" };
+    V3dModelManager modelManager{ document() };
 
     // [INHERITED] load a document and fill up the pagesVector
     Okular::Document::OpenResult loadDocumentWithPassword(const QString &filePath, QVector<Okular::Page *> &pagesVector, const QString &password) override;
