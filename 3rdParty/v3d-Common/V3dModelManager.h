@@ -15,7 +15,7 @@
 #include "V3dModel.h"
 #include "Rendering/renderheadless.h"
 
-//#define MOUSE_BOUNDARIES
+// #define MOUSE_BOUNDARIES
 
 class EventFilter;
 
@@ -114,9 +114,12 @@ private:
     QAbstractScrollArea* m_PageView{ nullptr };
     EventFilter* m_EventFilter{ nullptr };
 
+    std::chrono::time_point<std::chrono::system_clock> m_StartTime{ };
+
     struct RequestCache {
         glm::ivec2 size;
         int priority{ std::numeric_limits<int>::max() };
+        std::chrono::duration<double> requestTime{ };
     };
 
     std::vector<RequestCache> m_CachedRequestSizes;
