@@ -344,7 +344,10 @@ Okular::FormFieldChoice::ChoiceType PopplerFormFieldChoice::choiceType() const
 
 QStringList PopplerFormFieldChoice::choices() const
 {
-    return m_field->choices();
+    if (!m_choices) {
+        m_choices = m_field->choices();
+    }
+    return *m_choices;
 }
 
 bool PopplerFormFieldChoice::isEditable() const
@@ -375,6 +378,15 @@ QString PopplerFormFieldChoice::editChoice() const
 void PopplerFormFieldChoice::setEditChoice(const QString &text)
 {
     m_field->setEditChoice(text);
+}
+
+void PopplerFormFieldChoice::setAppearanceChoiceText(const QString &text)
+{
+#if POPPLER_VERSION_MACRO >= QT_VERSION_CHECK(24, 8, 0)
+    m_field->setAppearanceChoiceText(text);
+#else
+    Q_UNUSED(text);
+#endif
 }
 
 Qt::Alignment PopplerFormFieldChoice::textAlignment() const

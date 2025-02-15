@@ -11,7 +11,7 @@
 #ifndef _OKULAR_GENERATOR_PDF_H_
 #define _OKULAR_GENERATOR_PDF_H_
 
-//#include "synctex/synctex_parser.h"
+// #include "synctex/synctex_parser.h"
 
 #include <poppler-qt6.h>
 #include <poppler-version.h>
@@ -30,8 +30,6 @@
 #include <interfaces/saveinterface.h>
 
 #include <unordered_map>
-
-#include "V3dModelManager.h"
 
 class PDFOptionsPage;
 class PopplerAnnotationProxy;
@@ -60,8 +58,6 @@ public:
     PDFGenerator(QObject *parent, const QVariantList &args);
     ~PDFGenerator() override;
 
-    V3dModelManager modelManager{ document() };
-
     // [INHERITED] load a document and fill up the pagesVector
     Okular::Document::OpenResult loadDocumentWithPassword(const QString &filePath, QVector<Okular::Page *> &pagesVector, const QString &password) override;
     Okular::Document::OpenResult loadDocumentFromDataWithPassword(const QByteArray &fileData, QVector<Okular::Page *> &pagesVector, const QString &password) override;
@@ -71,12 +67,14 @@ public:
     const Okular::DocumentSynopsis *generateDocumentSynopsis() override;
     Okular::FontInfo::List fontsForPage(int page) override;
     const QList<Okular::EmbeddedFile *> *embeddedFiles() const override;
+    PageLayout defaultPageLayout() const override;
+    bool defaultPageContinuous() const override;
     PageSizeMetric pagesSizeMetric() const override
     {
         return Pixels;
     }
     QAbstractItemModel *layersModel() const override;
-    void opaqueAction(const Okular::BackendOpaqueAction *action) override;
+    Okular::BackendOpaqueAction::OpaqueActionResult opaqueAction(const Okular::BackendOpaqueAction *action) override;
 
     // [INHERITED] document information
     bool isAllowed(Okular::Permission permission) const override;
@@ -154,6 +152,7 @@ private:
     void xrefReconstructionHandler();
 
     // misc variables for document info and synopsis caching
+    QString documentFilePath;
     bool docSynopsisDirty;
     bool xrefReconstructed;
     Okular::DocumentSynopsis docSyn;

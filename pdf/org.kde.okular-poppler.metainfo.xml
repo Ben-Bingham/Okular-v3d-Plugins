@@ -41,6 +41,7 @@
   <name xml:lang="pt-BR">PDF</name>
   <name xml:lang="ro">PDF</name>
   <name xml:lang="ru">PDF</name>
+  <name xml:lang="sa">PDF</name>
   <name xml:lang="sk">PDF</name>
   <name xml:lang="sl">PDF</name>
   <name xml:lang="sr">ПДФ</name>
@@ -91,6 +92,7 @@
   <summary xml:lang="pt-BR">Adiciona o suporte para leitura de documentos em PDF</summary>
   <summary xml:lang="ro">Adaugă suport pentru citirea documentelor PDF</summary>
   <summary xml:lang="ru">Поддержка чтения документов PDF</summary>
+  <summary xml:lang="sa">PDF दस्तावेजानां पठनार्थं समर्थनं योजयति</summary>
   <summary xml:lang="sk">Pridá podporu pre čítanie PDF dokumentov</summary>
   <summary xml:lang="sl">Doda podporo za branje dokumentov PDF</summary>
   <summary xml:lang="sr">Подршка за читање ПДФ докумената</summary>
@@ -113,6 +115,12 @@
   </provides>
   <url type="homepage">https://okular.kde.org</url>
   <releases>
+    <release version="24.12.2" date="2025-02-06"/>
+    <release version="24.12.1" date="2025-01-09"/>
+    <release version="24.12.0" date="2024-12-12"/>
+    <release version="24.08.3" date="2024-11-07"/>
+    <release version="24.08.2" date="2024-10-10"/>
+    <release version="24.08.1" date="2024-09-12"/>
     <release version="24.08.0" date="2024-08-22"/>
     <release version="24.05.2" date="2024-07-04"/>
     <release version="24.05.1" date="2024-06-13"/>

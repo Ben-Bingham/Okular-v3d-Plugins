@@ -39,6 +39,7 @@
 #include "Utility/ProtectedFunctionCaller.h"
 
 #include "Utility/Arcball.h"
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/string_cast.hpp>
 
 OKULAR_EXPORT_PLUGIN(V3dGenerator, "libokularGenerator_v3d.json")

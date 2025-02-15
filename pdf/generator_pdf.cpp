@@ -12,12 +12,6 @@
 
 #include <memory>
 
-#include <gzip/compress.hpp>
-#include <gzip/config.hpp>
-#include <gzip/decompress.hpp>
-#include <gzip/utils.hpp>
-#include <gzip/version.hpp>
-
 #include "generator_pdf.h"
 
 // qt/kde includes
@@ -120,7 +114,7 @@ public:
         // If the user selects a scaling mode that requires the use of the
         // "Force rasterization" feature, enable it automatically so they don't
         // have to 1) know this and 2) do it manually
-        connect(m_scaleMode, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [=](int index) { m_forceRaster->setChecked(index != 0); });
+        connect(m_scaleMode, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [=, this](int index) { m_forceRaster->setChecked(index != 0); });
 
         layout->addWidget(formWidget);
 
@@ -368,7 +362,7 @@ QPair<Okular::Movie *, Okular::EmbeddedFile *> createMovieFromPopplerRichMedia(c
     return qMakePair(movie, pdfEmbeddedFile);
 }
 
-static Okular::DocumentAction::DocumentActionType popplerToOkular(Poppler::LinkAction::ActionType pat)
+static std::optional<Okular::DocumentAction::DocumentActionType> popplerToOkular(Poppler::LinkAction::ActionType pat)
 {
     switch (pat) {
     case Poppler::LinkAction::PageFirst:
@@ -404,10 +398,7 @@ static Okular::DocumentAction::DocumentActionType popplerToOkular(Poppler::LinkA
     }
 
     qWarning() << "Unsupported Poppler::LinkAction::ActionType" << pat;
-    // TODO When we can use C++17 make this function return an optional
-    //      for now it's not super important since at the time of writing
-    //      okular DocumentAction supports all that poppler ActionType supports
-    return Okular::DocumentAction::PageFirst;
+    return {};
 }
 
 // helper for using std::visit to get a dependent false for static_asserts
@@ -479,7 +470,10 @@ Okular::Action *createLinkFromPopplerLink(std::variant<const Poppler::Link *, st
 
     case Poppler::Link::Action: {
         auto popplerLinkAction = static_cast<const Poppler::LinkAction *>(rawPopplerLink);
-        link = new Okular::DocumentAction(popplerToOkular(popplerLinkAction->actionType()));
+        const auto okularLinkActionType = popplerToOkular(popplerLinkAction->actionType());
+        if (okularLinkActionType) {
+            link = new Okular::DocumentAction(okularLinkActionType.value());
+        }
         break;
     }
 
@@ -598,8 +592,22 @@ Okular::Action *createLinkFromPopplerLink(std::variant<const Poppler::Link *, st
         break;
     }
 #if POPPLER_VERSION_MACRO >= QT_VERSION_CHECK(24, 07, 0)
-    case Poppler::Link::ResetForm:
-        break;
+    case Poppler::Link::ResetForm: {
+        if (!std::holds_alternative<std::unique_ptr<Poppler::Link>>(popplerLink)) {
+            // See comment above in Link::Rendition
+            qCDebug(OkularPdfDebug) << "ResetForm link without taking ownership is not supported. Action chain might be broken.";
+            break;
+        }
+        link = new Okular::BackendOpaqueAction();
+        auto uniquePopplerLink = std::get<std::unique_ptr<Poppler::Link>>(std::move(popplerLink));
+        auto popplerLinkResetForm = toSharedPointer<const Poppler::LinkResetForm>(std::move(uniquePopplerLink));
+        link->setNativeHandle(popplerLinkResetForm);
+    } break;
+#endif
+#if POPPLER_VERSION_MACRO >= QT_VERSION_CHECK(24, 10, 0)
+    case Poppler::Link::SubmitForm: {
+        // TODO
+    } break;
 #endif
     }
 
@@ -707,9 +715,6 @@ PDFGenerator::~PDFGenerator()
 // BEGIN Generator inherited functions
 Okular::Document::OpenResult PDFGenerator::loadDocumentWithPassword(const QString &filePath, QVector<Okular::Page *> &pagesVector, const QString &password)
 {
-    if (document() != nullptr) {
-        modelManager.SetDocument(document());
-    }
 #ifndef NDEBUG
     if (pdfdoc) {
         qCDebug(OkularPdfDebug) << "PDFGenerator: multiple calls to loadDocument. Check it.";
@@ -718,6 +723,7 @@ Okular::Document::OpenResult PDFGenerator::loadDocumentWithPassword(const QStrin
 #endif
     // create PDFDoc for the given file
     pdfdoc = Poppler::Document::load(filePath, nullptr, nullptr);
+    documentFilePath = filePath;
     return init(pagesVector, password);
 }
 
@@ -731,6 +737,7 @@ Okular::Document::OpenResult PDFGenerator::loadDocumentFromDataWithPassword(cons
 #endif
     // create PDFDoc for the given file
     pdfdoc = Poppler::Document::loadFromData(fileData, nullptr, nullptr);
+    documentFilePath = QString();
     return init(pagesVector, password);
 }
 
@@ -902,7 +909,7 @@ void PDFGenerator::loadPages(QVector<Okular::Page *> &pagesVector, int rotation,
             }
             tmplink = p->action(Poppler::Page::Closing);
             if (tmplink) {
-                page->setPageAction(Okular::Page::Closing, createLinkFromPopplerLink(std::move(tmplink.get())));
+                page->setPageAction(Okular::Page::Closing, createLinkFromPopplerLink(tmplink.get()));
             }
             page->setDuration(p->duration());
             page->setLabel(p->label());
@@ -1151,15 +1158,56 @@ const QList<Okular::EmbeddedFile *> *PDFGenerator::embeddedFiles() const
     return &docEmbeddedFiles;
 }
 
+PDFGenerator::PageLayout PDFGenerator::defaultPageLayout() const
+{
+    Poppler::Document::PageLayout defaultValue = pdfdoc->pageLayout();
+
+    switch (defaultValue) {
+    case Poppler::Document::OneColumn:
+    case Poppler::Document::SinglePage:
+        return PDFGenerator::SinglePage;
+    case Poppler::Document::TwoColumnLeft:
+    case Poppler::Document::TwoPageLeft:
+        return PDFGenerator::TwoPageLeft;
+    case Poppler::Document::TwoPageRight:
+    case Poppler::Document::TwoColumnRight:
+        return PDFGenerator::TwoPageRight;
+    case Poppler::Document::NoLayout:
+        return PDFGenerator::NoLayout;
+    }
+    return PDFGenerator::NoLayout;
+}
+
+bool PDFGenerator::defaultPageContinuous() const
+{
+    Poppler::Document::PageLayout defaultValue = pdfdoc->pageLayout();
+
+    if ((defaultValue == Poppler::Document::OneColumn) || (defaultValue == Poppler::Document::TwoColumnLeft) || (defaultValue == Poppler::Document::TwoColumnRight)) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
 QAbstractItemModel *PDFGenerator::layersModel() const
 {
     return pdfdoc->hasOptionalContent() ? pdfdoc->optionalContentModel() : nullptr;
 }
 
-void PDFGenerator::opaqueAction(const Okular::BackendOpaqueAction *action)
+Okular::BackendOpaqueAction::OpaqueActionResult PDFGenerator::opaqueAction(const Okular::BackendOpaqueAction *action)
 {
-    const Poppler::LinkOCGState *popplerLink = static_cast<const Poppler::LinkOCGState *>(action->nativeHandle());
-    pdfdoc->optionalContentModel()->applyLink(const_cast<Poppler::LinkOCGState *>(popplerLink));
+    const Poppler::Link *popplerLink = static_cast<const Poppler::Link *>(action->nativeHandle());
+    if (const Poppler::LinkOCGState *ocgLink = dynamic_cast<const Poppler::LinkOCGState *>(popplerLink)) {
+        pdfdoc->optionalContentModel()->applyLink(const_cast<Poppler::LinkOCGState *>(ocgLink));
+        return Okular::BackendOpaqueAction::DoNothing;
+    }
+#if POPPLER_VERSION_MACRO >= QT_VERSION_CHECK(24, 07, 0)
+    else if (const Poppler::LinkResetForm *resetFormLink = dynamic_cast<const Poppler::LinkResetForm *>(popplerLink)) {
+        pdfdoc->applyResetFormsLink(*resetFormLink);
+        return Okular::BackendOpaqueAction::RefreshForms;
+    }
+#endif
+    return Okular::BackendOpaqueAction::DoNothing;
 }
 
 bool PDFGenerator::isAllowed(Okular::Permission permission) const
@@ -1239,8 +1287,6 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
     // compute dpi used to get an image with desired width and height
     Okular::Page *page = request->page();
 
-    modelManager.CacheRequest(request);
-
     double pageWidth = page->width(), pageHeight = page->height();
 
     if (page->rotation() % 2) {
@@ -1265,12 +1311,10 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
     // note: thread safety is set on 'false' for the GUI (this) thread
     std::unique_ptr<Poppler::Page> p = pdfdoc->page(page->number());
 
-    bool isTile = false;
     // 2. Take data from outputdev and attach it to the Page
     QImage img;
     if (p) {
         if (request->isTile()) {
-            isTile = true;
             const QRect rect = request->normalizedRect().geometry(request->width(), request->height());
             if (request->partialUpdatesWanted()) {
                 RenderImagePayload payload(this, request);
@@ -1303,36 +1347,6 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
 
         resolveMediaLinkReferences(page);
     }
-
-    // Custom
-    if (!img.isNull() && img.format() != QImage::Format_Mono && !modelManager.Empty()) {
-        size_t pageNumber = (size_t)request->page()->number();
-
-        int i = 0;
-        for (auto& model : modelManager.Models(pageNumber)) {
-            int xMin = (int)(request->width() * model.minBound.x);
-            int xMax = (int)(request->width() * model.maxBound.x);
-            int yMin = (int)(request->height() * model.minBound.y);
-            int yMax = (int)(request->height() * model.maxBound.y);
-            
-            int imageWidth = xMax - xMin;
-            int imageHeight = yMax - yMin;
-
-            QImage image = modelManager.RenderModel(pageNumber, i, imageWidth, imageHeight);
-
-            QPainter painter{ &img };
-
-            if (isTile) {
-                painter.drawImage(xMin - request->normalizedRect().left * request->width(), yMin - request->normalizedRect().top * request->height(), image);
-            } else {
-                painter.drawImage(xMin, yMin, image);
-            }
-
-            ++i;
-        }
-    }
-
-    modelManager.DrawMouseBoundaries(&img, request->pageNumber());
 
     // 3. UNLOCK [re-enables shared access]
     userMutex()->unlock();
@@ -1468,6 +1482,8 @@ void PDFGenerator::okularToPoppler(const Okular::NewSignatureData &oData, Popple
     const QString datetime = QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd hh:mm:ss t"));
     pData->setSignatureText(i18n("Signed by: %1\n\nDate: %2", oData.certSubjectCommonName(), datetime));
     pData->setSignatureLeftText(oData.certSubjectCommonName());
+    pData->setFontSize(oData.fontSize());
+    pData->setLeftFontSize(oData.leftFontSize());
     const Okular::NormalizedRect bRect = oData.boundingRectangle();
     pData->setBoundingRectangle({bRect.left, bRect.top, bRect.width(), bRect.height()});
     pData->setFontColor(Qt::black);
@@ -1550,6 +1566,18 @@ Okular::Document::PrintError PDFGenerator::print(QPrinter &printer)
         }
         painter.end();
         return Okular::Document::NoPrintError;
+    }
+
+    // Check if we can send the PDF directly to the printer or need to convert to PS first
+    // We need PS if:
+    // - we are printing with annotations
+    // - we are printing to a file (otherwise page ranges are not respected)
+    // - our document isn't backed by a file
+    if (!printAnnots && printer.outputFileName().isEmpty() && !documentFilePath.isEmpty()) {
+        const Okular::FilePrinter::ScaleMode filePrinterScaleMode = (scaleMode == PDFOptionsPage::None) ? Okular::FilePrinter::ScaleMode::NoScaling : Okular::FilePrinter::ScaleMode::FitToPrintArea;
+
+        return Okular::FilePrinter::printFile(
+            printer, documentFilePath, document()->orientation(), Okular::FilePrinter::ApplicationDeletesFiles, Okular::FilePrinter::SystemSelectsPages, document()->bookmarkedPageRange(), filePrinterScaleMode);
     }
 
 #ifdef DUMMY_QPRINTER_COPY
@@ -1889,49 +1917,6 @@ void PDFGenerator::addAnnotations(Poppler::Page *popplerPage, Okular::Page *page
     std::vector<std::unique_ptr<Poppler::Annotation>> popplerAnnotations = popplerPage->annotations(subtypes);
 
     for (auto &a : popplerAnnotations) {
-        // ============== Custom ==============
-        if (a->subType() == Poppler::Annotation::SubType::ARichMedia) {
-            QRectF bound = a->boundary();
-            bound = bound.normalized();
-
-            Poppler::RichMediaAnnotation* richMedia = dynamic_cast<Poppler::RichMediaAnnotation*>(a.get());
-            if (richMedia == nullptr) {
-                continue;
-            }
-
-            Poppler::RichMediaAnnotation::Content* content = richMedia->content();
-            if (content == nullptr) {
-                continue;
-            }
-
-            QList<Poppler::RichMediaAnnotation::Asset*> assets = content->assets();
-
-            for (Poppler::RichMediaAnnotation::Asset* asset : assets) {
-                if (asset == nullptr) {
-                    continue;
-                }
-                
-                Poppler::EmbeddedFile* embeddedFile = asset->embeddedFile();
-                if (embeddedFile == nullptr) {
-                    continue;
-                }
-
-                QByteArray fileData = embeddedFile->data();
-
-                std::string decompressedData = gzip::decompress(fileData.data(), fileData.size());
-
-                xdr::memixstream xdrFile{ decompressedData.data(), decompressedData.size() };
-
-                QRectF bound = a->boundary();
-                bound = bound.normalized();
-
-                glm::vec2 minBound{ bound.left(), bound.top() };
-                glm::vec2 maxBound{ bound.right(), bound.bottom() };
-
-                modelManager.AddModel(V3dModel{ xdrFile, minBound, maxBound }, page->number());         
-            }    
-        }
-        // ============== End Custom ==============
         bool doDelete = true;
         Okular::Annotation *newann = createAnnotationFromPopplerAnnotation(a.get(), *popplerPage, &doDelete);
         if (newann) {

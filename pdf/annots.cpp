@@ -11,8 +11,11 @@
 #include "annots.h"
 
 // qt/kde includes
+#include <QDir>
 #include <QFileInfo>
+#include <QImageReader>
 #include <QLoggingCategory>
+#include <QTemporaryFile>
 #include <QVariant>
 
 #include <core/annotations.h>
@@ -20,6 +23,7 @@
 
 #include "debug_pdf.h"
 #include "generator_pdf.h"
+#include "imagescaling.h"
 #include "popplerembeddedfile.h"
 
 Q_DECLARE_METATYPE(Poppler::Annotation *)
@@ -28,6 +32,16 @@ extern Okular::Sound *createSoundFromPopplerSound(const Poppler::SoundObject *po
 extern Okular::Movie *createMovieFromPopplerMovie(const Poppler::MovieObject *popplerMovie);
 extern Okular::Movie *createMovieFromPopplerScreen(const Poppler::LinkRendition *popplerScreen);
 extern QPair<Okular::Movie *, Okular::EmbeddedFile *> createMovieFromPopplerRichMedia(const Poppler::RichMediaAnnotation *popplerRichMedia);
+
+struct SignatureImageHelper {
+    SignatureImageHelper(std::unique_ptr<QTemporaryFile> &&tmpfile, const QString &imgpath)
+        : imageFile(std::move(tmpfile))
+        , imagePath(imgpath)
+    {
+    }
+    std::unique_ptr<QTemporaryFile> imageFile;
+    QString imagePath;
+};
 
 static void disposeAnnotation(const Okular::Annotation *ann)
 {
@@ -421,6 +435,86 @@ static Poppler::Annotation *createPopplerAnnotationFromOkularAnnotation(const Ok
     return pStampAnnotation;
 }
 
+#if HAVE_NEW_SIGNATURE_API
+static Okular::SigningResult popperToOkular(Poppler::SignatureAnnotation::SigningResult pResult)
+{
+    switch (pResult) {
+    case Poppler::SignatureAnnotation::SigningSuccess:
+        return Okular::SigningSuccess;
+    case Poppler::SignatureAnnotation::FieldAlreadySigned:
+        return Okular::FieldAlreadySigned;
+    case Poppler::SignatureAnnotation::GenericSigningError:
+        return Okular::GenericSigningError;
+#if POPPLER_VERSION_MACRO >= QT_VERSION_CHECK(24, 12, 0)
+    case Poppler::SignatureAnnotation::InternalError:
+        return Okular::InternalSigningError;
+    case Poppler::SignatureAnnotation::KeyMissing:
+        return Okular::KeyMissing;
+    case Poppler::SignatureAnnotation::WriteFailed:
+        return Okular::SignatureWriteFailed;
+    case Poppler::SignatureAnnotation::UserCancelled:
+        return Okular::UserCancelled;
+#endif
+    }
+    return Okular::GenericSigningError;
+}
+
+void resizeImage(const SignatureImageHelper *helper, int page, const Okular::NormalizedRect &bRect, Poppler::Document *pdfdoc)
+{
+    QImageReader reader(helper->imagePath);
+
+    // 2 is an experimental decided upon fudge factor to compensate for the fact that pageSize is in points
+    // but most of this ends up working in pixels anyway
+    double width = pdfdoc->page(page)->pageSizeF().width() * bRect.width() * 2;
+    double height = pdfdoc->page(page)->pageSizeF().height() * bRect.height() * 2;
+
+    QSize imageSize = reader.size();
+    if (!reader.size().isNull()) {
+        reader.setScaledSize(imageSize.scaled(width, height, Qt::KeepAspectRatio));
+    }
+    auto input = reader.read();
+    if (!input.isNull()) {
+        auto scaled = imagescaling::scaleAndFitCanvas(input, QSize(width, height));
+        scaled.save(helper->imageFile->fileName(), "png");
+    }
+}
+
+static std::unique_ptr<Poppler::Annotation> createPopplerAnnotationFromOkularAnnotation(Okular::SignatureAnnotation *oSignatureAnnotation, Poppler::Document *pdfdoc)
+{
+    auto pSignatureAnnotation = std::make_unique<Poppler::SignatureAnnotation>();
+
+    auto helper = std::make_shared<SignatureImageHelper>(std::make_unique<QTemporaryFile>(QDir::tempPath() + QStringLiteral("/okular_signature_XXXXXXX.png")), oSignatureAnnotation->imagePath());
+    helper->imageFile->setAutoRemove(true);
+    if (!helper->imageFile->open()) {
+        return {};
+    }
+
+    pSignatureAnnotation->setBorderColor(QColor(0, 0, 0));
+    pSignatureAnnotation->setFontColor(QColor(0, 0, 0));
+
+    setSharedAnnotationPropertiesToPopplerAnnotation(oSignatureAnnotation, pSignatureAnnotation.get());
+    pSignatureAnnotation->setLeftText(oSignatureAnnotation->leftText());
+    pSignatureAnnotation->setText(oSignatureAnnotation->text());
+    pSignatureAnnotation->setFieldPartialName(oSignatureAnnotation->fieldPartialName());
+    pSignatureAnnotation->setFontSize(oSignatureAnnotation->fontSize());
+    pSignatureAnnotation->setLeftFontSize(oSignatureAnnotation->leftFontSize());
+
+    if (!oSignatureAnnotation->imagePath().isEmpty()) {
+        resizeImage(helper.get(), oSignatureAnnotation->page(), oSignatureAnnotation->boundingRectangle(), pdfdoc);
+        pSignatureAnnotation->setImagePath(helper->imageFile->fileName());
+        oSignatureAnnotation->setNativeData(helper);
+    }
+
+    oSignatureAnnotation->setSignFunction([signatureAnnotation = pSignatureAnnotation.get()](const Okular::NewSignatureData &oData, const QString &fileName) {
+        Poppler::PDFConverter::NewSignatureData pData;
+        PDFGenerator::okularToPoppler(oData, &pData);
+        return popperToOkular(signatureAnnotation->sign(fileName, pData));
+    });
+
+    return pSignatureAnnotation;
+}
+#endif
+
 static Poppler::Annotation *createPopplerAnnotationFromOkularAnnotation(const Okular::InkAnnotation *oInkAnnotation)
 {
     Poppler::InkAnnotation *pInkAnnotation = new Poppler::InkAnnotation();
@@ -484,6 +578,19 @@ void PopplerAnnotationProxy::notifyAddition(Okular::Annotation *okl_ann, int pag
     case Okular::Annotation::ACaret:
         ppl_ann = createPopplerAnnotationFromOkularAnnotation(static_cast<Okular::CaretAnnotation *>(okl_ann));
         break;
+#if HAVE_NEW_SIGNATURE_API
+    case Okular::Annotation::AWidget: {
+        if (auto signatureAnnt = dynamic_cast<Okular::SignatureAnnotation *>(okl_ann)) {
+            signatureAnnt->setPage(page);
+            ppl_ann = createPopplerAnnotationFromOkularAnnotation(signatureAnnt, ppl_doc).release();
+        } else {
+            qWarning() << "Unsupported annotation type" << okl_ann->subType();
+        }
+
+        break;
+    }
+#endif
+
     default:
         qWarning() << "Unsupported annotation type" << okl_ann->subType();
         return;
@@ -570,6 +677,21 @@ void PopplerAnnotationProxy::notifyModification(const Okular::Annotation *okl_an
         updatePopplerAnnotationFromOkularAnnotation(okl_inkann, ppl_inkann);
         break;
     }
+    case Poppler::Annotation::AWidget:
+#if HAVE_NEW_SIGNATURE_API
+    {
+        if (auto signature = dynamic_cast<const Okular::SignatureAnnotation *>(okl_ann)) {
+            auto helper = static_cast<const SignatureImageHelper *>(signature->nativeData());
+
+            if (helper) {
+                resizeImage(helper, signature->page(), signature->boundingRectangle(), ppl_doc);
+            }
+
+            break;
+        }
+    }
+#endif
+        [[fallthrough]];
     default:
         qCDebug(OkularPdfDebug) << "Type-specific property modification is not implemented for this annotation type";
         break;
