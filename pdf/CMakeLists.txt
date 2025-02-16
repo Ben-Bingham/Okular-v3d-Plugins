@@ -9,6 +9,16 @@ include_directories(
    ${CMAKE_CURRENT_SOURCE_DIR}/../..
 )
 
+include_directories(
+   "../3rdParty/v3d-Common"
+   "../3rdParty/gzip-hpp/include"
+
+   "../../../core/"
+
+   "/usr/include/poppler/qt6"
+   "/usr/include/tirpc" 
+)
+
 ########### next target ###############
 
 set(okularGenerator_poppler_PART_SRCS
@@ -18,6 +28,18 @@ set(okularGenerator_poppler_PART_SRCS
    pdfsignatureutils.cpp
    pdfsettingswidget.cpp
    imagescaling.cpp
+
+   ../3rdParty/v3d-Common/Rendering/renderheadless.cpp
+   ../3rdParty/v3d-Common/3rdParty/VulkanTools/VulkanTools.cpp
+   ../3rdParty/v3d-Common/V3dFile/V3dFile.cpp
+   ../3rdParty/v3d-Common/V3dFile/V3dObject.cpp
+   ../3rdParty/v3d-Common/V3dFile/V3dObjects.cpp
+   ../3rdParty/v3d-Common/V3dFile/V3dUtil.cpp
+   ../3rdParty/v3d-Common/Utility/Arcball.cpp
+   ../3rdParty/v3d-Common/Utility/ProtectedFunctionCaller.cpp
+   ../3rdParty/v3d-Common/Utility/EventFilter.cpp
+   ../3rdParty/v3d-Common/V3dModel.cpp
+   ../3rdParty/v3d-Common/V3dModelManager.cpp
 )
 
 ki18n_wrap_ui(okularGenerator_poppler_PART_SRCS
@@ -28,7 +50,7 @@ kconfig_add_kcfg_files(okularGenerator_poppler_PART_SRCS GENERATE_MOC conf/pdfse
 
 okular_add_generator(okularGenerator_poppler ${okularGenerator_poppler_PART_SRCS})
 
-target_link_libraries(okularGenerator_poppler okularcore KF6::I18n KF6::Completion KF6::KIOWidgets Poppler::Qt6 Qt6::Xml)
+target_link_libraries(okularGenerator_poppler okularcore KF6::I18n KF6::Completion KF6::KIOWidgets Poppler::Qt6 Qt6::Xml vulkan tirpc z)
 
 ########### autotests ###############
 

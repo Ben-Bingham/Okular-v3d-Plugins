@@ -31,6 +31,8 @@
 
 #include <unordered_map>
 
+#include "V3dModelManager.h"
+
 class PDFOptionsPage;
 class PopplerAnnotationProxy;
 
@@ -53,6 +55,12 @@ class PDFGenerator : public Okular::Generator, public Okular::ConfigInterface, p
     Q_INTERFACES(Okular::ConfigInterface)
     Q_INTERFACES(Okular::PrintInterface)
     Q_INTERFACES(Okular::SaveInterface)
+
+// ==================================== Custom Addition ====================================
+public:
+    V3dModelManager modelManager{ document() };
+
+// ================================= End of Custom Addition =================================
 
 public:
     PDFGenerator(QObject *parent, const QVariantList &args);

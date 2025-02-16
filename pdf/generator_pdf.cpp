@@ -10,6 +10,12 @@
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
+#include <gzip/compress.hpp>
+#include <gzip/config.hpp>
+#include <gzip/decompress.hpp>
+#include <gzip/utils.hpp>
+#include <gzip/version.hpp>
+
 #include <memory>
 
 #include "generator_pdf.h"
@@ -715,6 +721,9 @@ PDFGenerator::~PDFGenerator()
 // BEGIN Generator inherited functions
 Okular::Document::OpenResult PDFGenerator::loadDocumentWithPassword(const QString &filePath, QVector<Okular::Page *> &pagesVector, const QString &password)
 {
+    if (document() != nullptr) {
+        modelManager.SetDocument(document());
+    }
 #ifndef NDEBUG
     if (pdfdoc) {
         qCDebug(OkularPdfDebug) << "PDFGenerator: multiple calls to loadDocument. Check it.";
@@ -1311,6 +1320,8 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
     // note: thread safety is set on 'false' for the GUI (this) thread
     std::unique_ptr<Poppler::Page> p = pdfdoc->page(page->number());
 
+    bool isTile = false;
+
     // 2. Take data from outputdev and attach it to the Page
     QImage img;
     if (p) {
@@ -1347,6 +1358,38 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
 
         resolveMediaLinkReferences(page);
     }
+
+    // Custom
+    if (!img.isNull() && img.format() != QImage::Format_Mono && !modelManager.Empty()) {
+        size_t pageNumber = (size_t)request->page()->number();
+
+        int i = 0;
+        for (auto& model : modelManager.Models(pageNumber)) {
+            int xMin = (int)(request->width() * model.minBound.x);
+            int xMax = (int)(request->width() * model.maxBound.x);
+            int yMin = (int)(request->height() * model.minBound.y);
+            int yMax = (int)(request->height() * model.maxBound.y);
+            
+            int imageWidth = xMax - xMin;
+            int imageHeight = yMax - yMin;
+
+            modelManager.CacheRequest(request);
+
+            QImage image = modelManager.RenderModel(pageNumber, i, imageWidth, imageHeight);
+
+            QPainter painter{ &img };
+
+            if (isTile) {
+                painter.drawImage(xMin - request->normalizedRect().left * request->width(), yMin - request->normalizedRect().top * request->height(), image);
+            } else {
+                painter.drawImage(xMin, yMin, image);
+            }
+
+            ++i;
+        }
+    }
+
+    modelManager.DrawMouseBoundaries(&img, request->pageNumber());
 
     // 3. UNLOCK [re-enables shared access]
     userMutex()->unlock();
@@ -1917,6 +1960,50 @@ void PDFGenerator::addAnnotations(Poppler::Page *popplerPage, Okular::Page *page
     std::vector<std::unique_ptr<Poppler::Annotation>> popplerAnnotations = popplerPage->annotations(subtypes);
 
     for (auto &a : popplerAnnotations) {
+        // ============== Custom ==============
+        if (a->subType() == Poppler::Annotation::SubType::ARichMedia) {
+            QRectF bound = a->boundary();
+            bound = bound.normalized();
+
+            Poppler::RichMediaAnnotation* richMedia = dynamic_cast<Poppler::RichMediaAnnotation*>(a.get());
+            if (richMedia == nullptr) {
+                continue;
+            }
+
+            Poppler::RichMediaAnnotation::Content* content = richMedia->content();
+            if (content == nullptr) {
+                continue;
+            }
+
+            QList<Poppler::RichMediaAnnotation::Asset*> assets = content->assets();
+
+            for (Poppler::RichMediaAnnotation::Asset* asset : assets) {
+                if (asset == nullptr) {
+                    continue;
+                }
+                
+                Poppler::EmbeddedFile* embeddedFile = asset->embeddedFile();
+                if (embeddedFile == nullptr) {
+                    continue;
+                }
+
+                QByteArray fileData = embeddedFile->data();
+
+                std::string decompressedData = gzip::decompress(fileData.data(), fileData.size());
+
+                xdr::memixstream xdrFile{ decompressedData.data(), decompressedData.size() };
+
+                QRectF bound = a->boundary();
+                bound = bound.normalized();
+
+                glm::vec2 minBound{ bound.left(), bound.top() };
+                glm::vec2 maxBound{ bound.right(), bound.bottom() };
+
+                modelManager.AddModel(V3dModel{ xdrFile, minBound, maxBound }, page->number());         
+            }    
+        }
+        // ============== End Custom ==============
+
         bool doDelete = true;
         Okular::Annotation *newann = createAnnotationFromPopplerAnnotation(a.get(), *popplerPage, &doDelete);
         if (newann) {
